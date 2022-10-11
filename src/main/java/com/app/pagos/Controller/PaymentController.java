@@ -6,41 +6,41 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
+import com.app.pagos.Service.ConsignmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.app.pagos.Model.Payment;
 import com.app.pagos.Service.PaymentService;
 
 
+@CrossOrigin("https://daa1-186-168-237-73.ngrok.io/")
 @RestController
 @RequestMapping("/payments")
 public class PaymentController {
 	
 	PaymentService paymentService= new PaymentService();
+	ConsignmentService service = new ConsignmentService();
+
 	int cont =0;
 	
 	@PostMapping
 	public ResponseEntity<?> create(@RequestBody ArrayList<Payment> payment) {
-		for (int i = 0; i < payment.size(); i++) {
-			ResponseEntity.status(HttpStatus.CREATED).body(paymentService.save(payment.get(i)));
+
+		for (Payment payment1 :
+				payment) {
+			paymentService.save(payment1);
 		}
+		paymentService.loadFile();
 		
-		return ResponseEntity.status(HttpStatus.OK).body("El arraylist se recibio exitosamente");
+		return ResponseEntity.status(HttpStatus.CREATED).body("El arraylist se recibio exitosamente");
 	}
 	
 	@GetMapping("/{id}")
 	public ResponseEntity<?> findById(@PathVariable int id) {
-		Payment payment = paymentService.findById(id);
+		String payment = paymentService.findById(id);
 		if (payment== null) {
 			return ResponseEntity.notFound().build();
 		}
@@ -50,31 +50,32 @@ public class PaymentController {
 	@GetMapping
 	public ResponseEntity<?> findAll(){
 		//autoPayment();
-		ArrayList<Payment> payments = paymentService.findAll();
+		ArrayList<String> payments = paymentService.findAll();
 		//ArrayList<String> payments = paymentService.loadListEncrypted();
 		return ResponseEntity.ok(payments);
+		//return ResponseEntity.ok(String.valueOf(paymentService.key()));
 	}
 	
-	@GetMapping("/Owner{id}")
+	@GetMapping("/apto{id}")
 	public ResponseEntity<?> findByOwner(@PathVariable int id){
-		//autoPayment();
-		ArrayList<Payment> payments = paymentService.findByUser(id);
-		//ArrayList<String> payments = paymentService.loadListEncrypted();
+		ArrayList<String> payments = paymentService.findByUser(id);
 		return ResponseEntity.ok(payments);
 	}
 	
 	@PutMapping("/{id}")
-	public ResponseEntity<?> update(@PathVariable int id) throws Exception{
-		Payment payment = paymentService.findById(id);
-		if (payment==null) {
+	public ResponseEntity<?> update(@PathVariable int id) {
+		String line = paymentService.findById(id);
+		if (line==null) {
 			return ResponseEntity.notFound().build();
 		}
-		payment.setDate_PaidOut(String.valueOf(LocalDate.now()));
-		payment.setState("Pagado");
+		String [] paymentObject = line.split(";");
+		Payment payment = new Payment(Integer.parseInt(paymentObject[0]), paymentObject[1],Double.parseDouble(paymentObject[2]),Integer.parseInt(paymentObject[3]),Integer.parseInt(paymentObject[4]),Double.parseDouble(paymentObject[5]));
+		//payment.setState("Pagado");
 		
 		paymentService.deleteById(id);
-		
-		return ResponseEntity.status(HttpStatus.CREATED).body(paymentService.save(payment));
+		paymentService.save(payment);
+
+		return ResponseEntity.ok().build();
 	}
 	
 	@DeleteMapping("/{id}")
@@ -85,6 +86,20 @@ public class PaymentController {
 		paymentService.deleteById(id);
 		return ResponseEntity.ok().build();
 	}
+
+	@GetMapping("/apto={id}")
+	public ResponseEntity paymentValueT(@PathVariable int id){
+		return  ResponseEntity.status(HttpStatus.OK).body((int)paymentService.tValue(id));
+	}
+
+	@GetMapping("/state/{id}")
+	public ResponseEntity stateClient(@PathVariable int id){
+		if(paymentService.tValue(id)> service.vTotal(id)){
+			return ResponseEntity.status(HttpStatus.OK).body("En deuda");
+		}else{
+			return ResponseEntity.status(HttpStatus.OK).body("A paz y salvo");
+		}
+	}
 	
 //	private Payment autoPayment() {
 //		Date randomDate = new Date(ThreadLocalRandom.current().nextLong(, cont));
@@ -93,4 +108,8 @@ public class PaymentController {
 //		return payment;
 //	}
 
+
+	public PaymentService getPaymentService() {
+		return paymentService;
+	}
 }
